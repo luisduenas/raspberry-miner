@@ -1,8 +1,7 @@
-const http = require('http');
 const axios = require('axios');
 const SHA256 = require('crypto-js/sha256')
 const { MerkleTree } = require('merkletreejs')
-const SerialPort = require('serialport')
+
 const fs = require('fs');
 var ip = require('ip');
 const os = require('os');
@@ -11,10 +10,39 @@ var express = require('express');
 var bodyParser = require('body-parser');
 var gpio = require('pi-gpio');
 
-// Variables declaration
+
+var Gpio = require('onoff').Gpio; //include onoff to interact with the GPIO
+var LED = new Gpio(7, 'out'); //use GPIO pin 4, and specify that it is output
+
+// var blinkInterval = setInterval(blinkLED, 250); //run the blinkLED function every 250ms
+
+// LED.watch((err, value) => console.log(value));
+
+function blinkLED() { //function to start blinking
+  if (LED.readSync() === 0) { //check the pin state, if the state is 0 (or off)
+    console.log(0); //set pin state to 1 (turn LED on)
+  } else {
+    console.log(1); //set pin state to 0 (turn LED off)
+  }
+}
+
+const SerialPort = require('serialport')
+const port = new SerialPort('/dev/ttyACM0', function (err) {
+  if (err) {
+    logMessage(err.message,"error")
+    return console.log('Error: ', err.message)
+  }
+})
+
+port.on('readable', function () {
+  let data = port.read();
+  logMessage(`arduinosays: ${String.fromCharCode.apply(null, data)}`)
+  // TODO
+})
+
 var app = express();
 app.use(bodyParser.json());
-app.set('port', process.env.PORT || 3001);
+app.set('port', process.env.PORT || 8000);
 
 app.get('/whoareyou',(req,res) => {
   var temp = fs.readFileSync("/sys/class/thermal/thermal_zone0/temp");
@@ -25,6 +53,16 @@ app.get('/whoareyou',(req,res) => {
       myip: ip.address(),
       myname: os.homedir(),
       mytemp: temp_c,
+    });
+});
+
+app.get('/write',(req,res) => {
+  let msg = req.query.msg;
+  const response = serialWrite(msg);
+  res.status(200).send(
+    {
+      written: response,
+      message: msg
     });
 });
 
@@ -64,15 +102,12 @@ const getLatestBlock = async () => {
 
 const serialWrite = (msg) => {
   // port.write(msg, handleError)
-}
-
-const serialListen = () => {
-  gpio.on('change', ({channel, value}) => {
-    console.log('Channel ' + channel + ' value is now ' + value);
-    if(value == false){
-      serialWrite(merkle());
+  return port.write(msg, function(err) {
+    if (err) {
+      return console.log('Error on write: ', err.message)
     }
-  });
+    console.log('message written')
+  })
 }
 
 const merkle = () => {
@@ -94,6 +129,8 @@ const merkle = () => {
   logMessage(`end merke root`)
   logMessage(`elapsed time: ${seconds}s`)
   logMessage(`generated hash: ${root}`)
+
+  // serialWrite(root);
 
   return root;
 }

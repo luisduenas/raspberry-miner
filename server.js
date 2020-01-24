@@ -1,5 +1,5 @@
-const SHA256 = require('crypto-js/sha256')
-const { MerkleTree } = require('merkletreejs')
+// const SHA256 = require('crypto-js/sha256')
+// const { MerkleTree } = require('merkletreejs')
 const testing = require('./routes/testing.route'); // Imports routes for testing
 const fs = require('fs');
 const ip = require('ip');
@@ -7,9 +7,8 @@ const os = require('os');
 const express = require('express');
 const bodyParser = require('body-parser');
 const app = express();
-let txHashes = [];
+let _txHashes = [];
 const logger = require('./utils/logger');
-const axios = require('axios');
 const blocksManager = require('./utils/blocks-manager')
 
 
@@ -33,6 +32,11 @@ port.pipe(parser);
 port.on('open', () => logger.logMessage('Port open'));
 parser.on('data', (data)=> {
   logger.logMessage(`arduino-response: ${data}`);  
+  if(data == -1){
+    serialWrite(blocksManager.merkle(txHashes));
+    return;
+  }
+  // TODO:
 });
 
 
@@ -66,6 +70,8 @@ app.get('/write', (req, res) => {
 app.get('/test', async (req, res) => {
   let transactions = req.query.tx;
   const { ver, prev_block, mrkl_root, time, bits, nonce, txHashes } = await blocksManager.getLatestBlock();
+  logger.logMessage(`serial-write: ${serialWrite(`${ver + prev_block + mrkl_root + time + bits + nonce}`)}`);
+  _txHashes = txHashes;
   if (transactions) {
     res.status(200).send(
       {
@@ -98,35 +104,35 @@ app.get('/test', async (req, res) => {
 const serialWrite = (msg) => {
   return port.write(msg, function (err) {
     if (err) {
-      return console.log('Error on write: ', err.message)
+      return logger.logMessage(err.message,error)
     }
   })
 }
 
-const merkle = () => {
-  var startTime, endTime;
-  startTime = new Date();
-  logger.logMessage(`start merkle root`)
-  const leaves = txHashes.map(x => SHA256(x))
-  const tree = new MerkleTree(leaves, SHA256, { isBitcoinTree: true })
-  const root = tree.getRoot().toString('hex')
-  // MerkleTree.print(tree)
+// const merkle = () => {
+//   var startTime, endTime;
+//   startTime = new Date();
+//   logger.logMessage(`start merkle root`)
+//   const leaves = txHashes.map(x => SHA256(x))
+//   const tree = new MerkleTree(leaves, SHA256, { isBitcoinTree: true })
+//   const root = tree.getRoot().toString('hex')
+//   // MerkleTree.print(tree)
 
-  endTime = new Date();
-  var timeDiff = endTime - startTime; //in ms
-  // strip the ms
-  timeDiff /= 1000;
+//   endTime = new Date();
+//   var timeDiff = endTime - startTime; //in ms
+//   // strip the ms
+//   timeDiff /= 1000;
 
-  // get seconds 
-  var seconds = Math.round(timeDiff);
-  logger.logMessage(`end merke root`)
-  logger.logMessage(`elapsed time: ${seconds}s`)
-  logger.logMessage(`generated hash: ${root}`)
+//   // get seconds 
+//   var seconds = Math.round(timeDiff);
+//   logger.logMessage(`end merke root`)
+//   logger.logMessage(`elapsed time: ${seconds}s`)
+//   logger.logMessage(`generated hash: ${root}`)
 
-  // serialWrite(root);
+//   // serialWrite(root);
 
-  return root;
-}
+//   return root;
+// }
 
 // Start
 

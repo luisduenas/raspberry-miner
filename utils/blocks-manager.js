@@ -1,6 +1,7 @@
 const logger = require('./logger');
 const axios = require('axios');
-
+const SHA256 = require('crypto-js/sha256')
+const { MerkleTree } = require('merkletreejs')
 
 exports.getLatestBlock = async () => {
     try {

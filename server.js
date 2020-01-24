@@ -7,7 +7,7 @@ const os = require('os');
 const express = require('express');
 const bodyParser = require('body-parser');
 const app = express();
-let _txHashes = [];
+let _txHashes;
 const logger = require('./utils/logger');
 const blocksManager = require('./utils/blocks-manager')
 
@@ -15,9 +15,8 @@ const blocksManager = require('./utils/blocks-manager')
 const SerialPort = require('serialport')
 const parsers = SerialPort.parsers
 
-// Use a `\r\n` as a line terminator
 const parser = new parsers.Readline({
-  delimiter: '\r\n',
+  delimiter: '*',
 })
 
 const port = new SerialPort('/dev/ttyACM0', {
@@ -30,10 +29,14 @@ const port = new SerialPort('/dev/ttyACM0', {
 
 port.pipe(parser);
 port.on('open', () => logger.logMessage('Port open'));
-parser.on('data', (data)=> {
+parser.on('data', async (data)=> {
   logger.logMessage(`arduino-response: ${data}`);  
   if(data == -1){
-    serialWrite(blocksManager.merkle(txHashes));
+    if(_txHashes == undefined){
+      const { txHashes } = await blocksManager.getLatestBlock();
+      _txHashes = txHashes;
+    }
+    serialWrite(blocksManager.merkle(_txHashes));
     return;
   }
   // TODO:

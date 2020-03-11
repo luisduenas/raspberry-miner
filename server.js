@@ -45,7 +45,7 @@ parser.on('data', async (data)=> {
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
-app.use('/testing', testing);
+// app.use('/testing', testing);
 app.set('port', process.env.PORT || 8000);
 
 app.get('/whoareyou', (req, res) => {
@@ -103,6 +103,19 @@ app.get('/test', async (req, res) => {
 
 });
 
+app.get('/readArduino', async (req, res) => {
+  port.on('readable', function () {
+    let data = port.read();
+    logger.logMessage(`arduinosays: ${String.fromCharCode.apply(null, data)}`)
+    // TODO
+    // port.close();
+    res.send('Greetings from the Test controller!');
+
+})
+logger.logMessage('done');
+
+
+});
 
 const serialWrite = (msg) => {
   return port.write(msg, function (err) {
